@@ -155,7 +155,12 @@ class GameNet {
           if (this.pending) { this.send(this.pending); this.pending = null; }
         } else if (p.type === 3) {                 // PUBLISH
           const { payload } = readPublish(p.body);
-          try { this.onMessage(JSON.parse(payload)); } catch (e) {}
+          /* An empty payload is how MQTT clears a retained message, and a
+           * public topic can carry anything — parse defensively, but let a
+           * genuine bug in the handler surface instead of vanishing. */
+          let obj = null;
+          try { obj = payload ? JSON.parse(payload) : null; } catch (e) { obj = null; }
+          if (obj) this.onMessage(obj);
         }
       }
     };

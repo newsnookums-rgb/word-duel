@@ -2,9 +2,10 @@
  * The dictionary is 1.6 MB and never changes, so it is cached hard; the app
  * files go network-first so a fix reaches both phones on the next open. */
 
-const VERSION = 'wd-v1';
+const VERSION = 'wd-v2';
 const SHELL = [
-  './', './index.html', './engine.js', './net.js', './dict.txt', './manifest.json',
+  './', './index.html', './engine.js', './sync.js', './net.js', './dict.txt',
+  './manifest.json',
 ];
 
 self.addEventListener('install', (e) => {

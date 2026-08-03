@@ -188,6 +188,7 @@
 <div id="modalHost"></div>
 
 <script src="engine.js"></script>
+<script src="sync.js"></script>
 <script src="net.js"></script>
 <script>
 /* ==========================================================================
@@ -241,29 +242,7 @@ function saveLocal() {
   LS.set('wd_last', app.game ? app.game.room : null);
 }
 
-/* Two copies of the same room converge here. The move list only ever grows,
- * so the longer one contains the shorter; ties are broken deterministically
- * so both phones pick the same winner rather than ping-ponging. */
-function merge(mine, theirs) {
-  if (!theirs || !theirs.seed || !Array.isArray(theirs.moves)) return mine;
-  if (!mine) return theirs;
-  /* A joiner starts on an empty placeholder until the real game arrives. It
-   * must always lose, or the joiner's blank board would overwrite the game. */
-  if (mine.provisional !== theirs.provisional) return mine.provisional ? theirs : mine;
-  if (mine.id !== theirs.id) {
-    if (theirs.moves.length !== mine.moves.length) {
-      return theirs.moves.length > mine.moves.length ? theirs : mine;
-    }
-    return theirs.id < mine.id ? theirs : mine;
-  }
-  const out = theirs.moves.length > mine.moves.length ? { ...theirs } : { ...mine };
-  out.players = [0, 1].map((i) => {
-    const a = mine.players[i], b = theirs.players[i];
-    if (a && b) return a.id === b.id ? a : (a.id < b.id ? a : b);
-    return a || b || null;
-  });
-  return out;
-}
+/* sane() and merge() live in sync.js so they can be tested on their own. */
 
 /* ------------------------------------------------------------ networking */
 
