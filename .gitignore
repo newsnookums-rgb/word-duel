@@ -1,0 +1,6 @@
+test/cases.json
+test/games.json
+test/games_big.json
+test/*.log
+__pycache__/
+.DS_Store

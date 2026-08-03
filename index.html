@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0f1620">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Word Duel">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>Word Duel</title>
+<style>
+  :root {
+    --bg:#0f1620; --panel:#18222f; --line:#2b3a4d; --ink:#e8eef6; --dim:#8fa3ba;
+    --tile:#f0e0c0; --tileInk:#2b2115; --tileEdge:#c9b184;
+    --tw:#c0392b; --dw:#d1802a; --tl:#1e8a52; --dl:#2670ab;
+    --good:#3ddc84; --bad:#ff6b6b; --accent:#6ea8fe;
+    --pend:#ffd166;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; height:100%; overscroll-behavior:none; }
+  body {
+    background:var(--bg); color:var(--ink);
+    font:15px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    display:flex; flex-direction:column; height:100dvh; touch-action:manipulation;
+    user-select:none; -webkit-user-select:none;
+  }
+  button { font:inherit; color:inherit; background:none; border:none; cursor:pointer; }
+  .hidden { display:none !important; }
+
+  /* ---------------------------------------------------------- setup screen */
+  #setup { flex:1; display:flex; flex-direction:column; justify-content:center;
+           padding:24px; gap:14px; max-width:460px; margin:0 auto; width:100%; }
+  #setup h1 { font-size:30px; margin:0; letter-spacing:-.5px; }
+  #setup .sub { color:var(--dim); margin:0 0 10px; }
+  .field { display:flex; flex-direction:column; gap:6px; }
+  .field label { font-size:13px; color:var(--dim); }
+  input[type=text] {
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:13px; font:inherit; color:var(--ink); width:100%;
+  }
+  input[type=text]:focus { outline:none; border-color:var(--accent); }
+  .btn {
+    background:var(--accent); color:#06121f; font-weight:650; border-radius:10px;
+    padding:14px; text-align:center; width:100%;
+  }
+  .btn.ghost { background:var(--panel); color:var(--ink); border:1px solid var(--line); }
+  .btn:disabled { opacity:.45; }
+  .divider { display:flex; align-items:center; gap:10px; color:var(--dim); font-size:12px; }
+  .divider::before,.divider::after { content:""; flex:1; height:1px; background:var(--line); }
+
+  /* ----------------------------------------------------------- game header */
+  header { padding:8px 10px calc(8px); border-bottom:1px solid var(--line);
+           padding-top:max(8px,env(safe-area-inset-top)); background:var(--panel); }
+  .scores { display:flex; gap:8px; align-items:stretch; }
+  .pscore { flex:1; background:var(--bg); border:1px solid var(--line);
+            border-radius:10px; padding:6px 9px; min-width:0; }
+  .pscore.turn { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .pscore .nm { font-size:12px; color:var(--dim); white-space:nowrap;
+                overflow:hidden; text-overflow:ellipsis; }
+  .pscore .sc { font-size:21px; font-weight:700; line-height:1.15; }
+  .meta { display:flex; justify-content:space-between; align-items:center;
+          margin-top:6px; font-size:12px; color:var(--dim); gap:8px; }
+  .dot { width:7px; height:7px; border-radius:50%; display:inline-block;
+         background:var(--dim); margin-right:5px; vertical-align:middle; }
+  .dot.on { background:var(--good); } .dot.off { background:var(--bad); }
+  .dot.wait { background:var(--pend); }
+
+  /* ------------------------------------------------------------- the board */
+  #boardWrap { flex:1; display:flex; align-items:center; justify-content:center;
+               padding:6px; min-height:0; }
+  #board {
+    display:grid; grid-template-columns:repeat(15,1fr); gap:1.5px;
+    background:var(--line); padding:1.5px; border-radius:6px;
+    width:var(--bs); height:var(--bs);
+  }
+  .sq { background:#1d2a3c; border-radius:2px; position:relative;
+        display:flex; align-items:center; justify-content:center;
+        font-size:calc(var(--bs)/34); font-weight:700; color:#ffffff9c; }
+  .sq.tw{background:var(--tw)} .sq.dw{background:var(--dw)}
+  .sq.tl{background:var(--tl)} .sq.dl{background:var(--dl)}
+  .sq.star::after { content:"★"; font-size:calc(var(--bs)/24); color:#ffffff70; }
+  .sq.tgt { box-shadow:0 0 0 2px var(--accent) inset; }
+  .tile {
+    position:absolute; inset:0; background:var(--tile); color:var(--tileInk);
+    border-radius:3px; border-bottom:2px solid var(--tileEdge);
+    display:flex; align-items:center; justify-content:center;
+    font-weight:800; font-size:calc(var(--bs)/24); line-height:1;
+  }
+  .tile .v { position:absolute; right:1px; bottom:0px;
+             font-size:calc(var(--bs)/48); font-weight:700; opacity:.75; }
+  .tile.pending { background:var(--pend); border-bottom-color:#c9a13d; }
+  .tile.blank { color:#7a5cc4; }
+  .tile.last { box-shadow:0 0 0 2px var(--good); }
+
+  /* -------------------------------------------------------------- the rack */
+  #status { text-align:center; font-size:13px; padding:3px 10px; min-height:20px; }
+  #status.err { color:var(--bad); } #status.ok { color:var(--good); }
+  #rack { display:grid; grid-template-columns:repeat(7,1fr); gap:5px;
+          padding:5px 10px; max-width:420px; margin:0 auto; width:100%; }
+  .rt { aspect-ratio:1; background:var(--tile); color:var(--tileInk);
+        border-radius:6px; border-bottom:3px solid var(--tileEdge);
+        display:flex; align-items:center; justify-content:center;
+        font-weight:800; font-size:min(5.4vw,22px); position:relative; }
+  .rt .v { position:absolute; right:3px; bottom:1px; font-size:min(2.6vw,11px); opacity:.75; }
+  .rt.gone { opacity:.18; }
+  .rt.sel { outline:2.5px solid var(--accent); transform:translateY(-5px); }
+  .rt.swap { outline:2.5px solid var(--pend); }
+  .rt.empty { background:transparent; border-bottom-color:transparent; }
+
+  /* ------------------------------------------------------------- controls */
+  #controls { display:grid; grid-template-columns:repeat(5,1fr); gap:5px;
+              padding:5px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .ctl { background:var(--panel); border:1px solid var(--line); border-radius:9px;
+         padding:11px 2px; font-size:12px; text-align:center; font-weight:600; }
+  .ctl.primary { background:var(--accent); color:#06121f; border-color:var(--accent); }
+  .ctl:disabled { opacity:.35; }
+
+  /* ---------------------------------------------------------------- modals */
+  .modal { position:fixed; inset:0; background:#000a; display:flex;
+           align-items:center; justify-content:center; padding:20px; z-index:50; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px;
+          padding:18px; width:100%; max-width:400px; max-height:80dvh; overflow:auto; }
+  .card h3 { margin:0 0 12px; font-size:17px; }
+  .letters { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; }
+  .letters button { background:var(--tile); color:var(--tileInk); font-weight:800;
+                    border-radius:6px; padding:11px 0; }
+  .row { display:flex; gap:8px; margin-top:12px; }
+  .row .btn { flex:1; }
+  .logline { padding:7px 0; border-bottom:1px solid var(--line); font-size:13px; }
+  .logline .w { font-weight:700; }
+  .logline .p { color:var(--dim); font-size:12px; }
+  code.room { font-size:26px; letter-spacing:5px; font-weight:800; color:var(--accent);
+              display:block; text-align:center; padding:12px 0; }
+  .hint { font-size:12px; color:var(--dim); line-height:1.5; }
+</style>
+</head>
+<body>
+
+<!-- ======================================================= setup ======= -->
+<div id="setup">
+  <div>
+    <h1>Word Duel</h1>
+    <p class="sub">Words With Friends rules. Two players, live, any phone.</p>
+  </div>
+  <div class="field">
+    <label for="nameIn">Your name</label>
+    <input id="nameIn" type="text" maxlength="14" placeholder="Rohit" autocomplete="off">
+  </div>
+  <button class="btn" id="newBtn">Start a new game</button>
+  <div class="divider">or join one</div>
+  <div class="field">
+    <label for="codeIn">Game code from your friend</label>
+    <input id="codeIn" type="text" maxlength="6" placeholder="ABC123"
+           autocapitalize="characters" autocomplete="off">
+  </div>
+  <button class="btn ghost" id="joinBtn">Join game</button>
+  <p class="hint" id="resumeHint"></p>
+</div>
+
+<!-- ======================================================== game ======== -->
+<div id="game" class="hidden" style="display:flex;flex-direction:column;flex:1;min-height:0">
+  <header>
+    <div class="scores">
+      <div class="pscore" id="p0"><div class="nm">—</div><div class="sc">0</div></div>
+      <div class="pscore" id="p1"><div class="nm">—</div><div class="sc">0</div></div>
+    </div>
+    <div class="meta">
+      <span><span class="dot" id="netDot"></span><span id="netTxt">connecting</span></span>
+      <span id="bagTxt">104 tiles left</span>
+      <button id="menuBtn" style="color:var(--accent);font-weight:600">Menu</button>
+    </div>
+  </header>
+
+  <div id="boardWrap"><div id="board"></div></div>
+  <div id="status"></div>
+  <div id="rack"></div>
+  <div id="controls">
+    <button class="ctl primary" id="playBtn">Play</button>
+    <button class="ctl" id="recallBtn">Recall</button>
+    <button class="ctl" id="shuffleBtn">Shuffle</button>
+    <button class="ctl" id="swapBtn">Swap</button>
+    <button class="ctl" id="passBtn">Pass</button>
+  </div>
+</div>
+
+<div id="modalHost"></div>
+
+<script src="engine.js"></script>
+<script src="net.js"></script>
+<script>
+/* ==========================================================================
+ * Word Duel — app layer.
+ *
+ * The whole game is { seed, moves }. Everything on screen is derived by
+ * replaying that through ENGINE.replay, so the two phones cannot disagree:
+ * same seed and same moves always give the same board, racks and scores.
+ * A sync therefore just ships the move list, and merging two copies is
+ * "whoever has more moves wins" — safe because the game is strictly
+ * turn-based, so only one player can legally add a move at a time.
+ * ====================================================================== */
+
+const $ = (id) => document.getElementById(id);
+const LS = {
+  get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+let DICT = null;
+let deviceId = LS.get('wd_device', null);
+if (!deviceId) { deviceId = Math.random().toString(36).slice(2, 14); LS.set('wd_device', deviceId); }
+
+const app = {
+  game: null,      // { id, room, seed, players:[{id,name}|null,...], moves:[] }
+  state: null,     // derived by ENGINE.replay
+  me: -1,          // my player index
+  net: null,
+  pending: [],     // [{r,c,letter,blank,ri}] placed this turn, not yet played
+  rackView: [],
+  selected: -1,
+  swapping: null,  // Set of rack indices when in swap mode
+  lastPlayed: [],
+};
+
+/* --------------------------------------------------------------- helpers */
+
+const roomCode = () => {
+  const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // no I/O/0/1
+  return Array.from({ length: 6 }, () => A[Math.floor(Math.random() * A.length)]).join('');
+};
+
+function toast(msg, kind) {
+  const el = $('status');
+  el.textContent = msg || '';
+  el.className = kind || '';
+}
+
+function saveLocal() {
+  if (app.game) LS.set('wd_game_' + app.game.room, app.game);
+  LS.set('wd_last', app.game ? app.game.room : null);
+}
+
+/* Two copies of the same room converge here. The move list only ever grows,
+ * so the longer one contains the shorter; ties are broken deterministically
+ * so both phones pick the same winner rather than ping-ponging. */
+function merge(mine, theirs) {
+  if (!theirs || !theirs.seed || !Array.isArray(theirs.moves)) return mine;
+  if (!mine) return theirs;
+  /* A joiner starts on an empty placeholder until the real game arrives. It
+   * must always lose, or the joiner's blank board would overwrite the game. */
+  if (mine.provisional !== theirs.provisional) return mine.provisional ? theirs : mine;
+  if (mine.id !== theirs.id) {
+    if (theirs.moves.length !== mine.moves.length) {
+      return theirs.moves.length > mine.moves.length ? theirs : mine;
+    }
+    return theirs.id < mine.id ? theirs : mine;
+  }
+  const out = theirs.moves.length > mine.moves.length ? { ...theirs } : { ...mine };
+  out.players = [0, 1].map((i) => {
+    const a = mine.players[i], b = theirs.players[i];
+    if (a && b) return a.id === b.id ? a : (a.id < b.id ? a : b);
+    return a || b || null;
+  });
+  return out;
+}
+
+/* ------------------------------------------------------------ networking */
+
+/* Publishes our copy, retained. The placeholder a joiner starts on must never
+ * go out: it is empty, and being retained it would erase the real game from
+ * the broker for anyone who opened the room later. */
+function push() {
+  if (!app.net || !app.game || app.game.provisional) return;
+  app.net.send(app.game);
+}
+
+function startNet() {
+  if (app.net) app.net.close();
+  app.net = new GameNet({
+    room: app.game.room,
+    onStatus: (s, detail) => {
+      const dot = $('netDot'), txt = $('netTxt');
+      dot.className = 'dot ' + (s === 'online' ? 'on' : s === 'connecting' ? 'wait' : 'off');
+      txt.textContent = s === 'online' ? 'live' : s === 'connecting'
+        ? 'connecting' + (detail ? ' (' + detail + ')' : '') : 'offline — will resync';
+      if (s === 'online') push();
+    },
+    onMessage: (incoming) => {
+      const before = JSON.stringify(app.game);
+      const merged = merge(app.game, incoming);
+      claimSeat(merged);
+      if (JSON.stringify(merged) === before) return;
+      app.game = merged;
+      saveLocal();
+      /* If our copy was ahead, push it back so they catch up too. */
+      if (app.game.moves.length > (incoming.moves || []).length) push();
+      refresh(true);
+    },
+  });
+}
+
+/* Whoever opens a room and finds an empty seat takes it. */
+function claimSeat(g) {
+  /* Never take a seat on the placeholder — those seats are not the real ones,
+   * and claiming one would make us fight the creator for player 1. */
+  if (g.provisional) { app.me = -1; return; }
+  const mine = g.players.findIndex((p) => p && p.id === deviceId);
+  if (mine >= 0) { app.me = mine; return; }
+  const free = g.players.findIndex((p) => !p);
+  if (free >= 0) {
+    g.players[free] = { id: deviceId, name: LS.get('wd_name', 'Player ' + (free + 1)) };
+    app.me = free;
+    if (app.net) app.net.send(g);
+  } else {
+    app.me = -1;   // both seats taken by other devices — watch only
+  }
+}
+
+/* --------------------------------------------------------- game commands */
+
+function commit(move) {
+  app.game.moves.push(move);
+  app.pending = [];
+  app.selected = -1;
+  app.swapping = null;
+  saveLocal();
+  push();
+  refresh(true);
+}
+
+function doPlay() {
+  if (!myTurn()) return toast('Not your turn.', 'err');
+  if (!app.pending.length) return toast('Place some tiles first.', 'err');
+  const placed = app.pending.map((p) => ({ r: p.r, c: p.c, letter: p.letter, blank: p.blank }));
+  const res = ENGINE.tryPlay(app.state, placed, DICT);
+  if (!res.ok) return toast(res.error, 'err');
+  app.lastPlayed = placed.map((p) => p.r + ',' + p.c);
+  commit({ t: 'play', p: app.me, tiles: placed });
+  const bits = [`${res.words[0].word} for ${res.total}`];
+  if (res.bingo) bits.push('BINGO +35!');
+  toast(bits.join(' — '), 'ok');
+}
+
+function doPass() {
+  if (!myTurn()) return toast('Not your turn.', 'err');
+  confirmBox('Pass your turn?', 'You score nothing this turn.', () => {
+    recall(); commit({ t: 'pass', p: app.me }); toast('You passed.');
+  });
+}
+
+function doResign() {
+  confirmBox('Resign this game?', 'Your opponent wins immediately.', () => {
+    commit({ t: 'resign', p: app.me });
+  });
+}
+
+function doSwapCommit() {
+  if (!myTurn()) { app.swapping = null; return toast('Not your turn.', 'err'); }
+  const idx = [...app.swapping];
+  if (!idx.length) { app.swapping = null; return refresh(); }
+  const tiles = idx.map((i) => app.rackView[i]);
+  if (tiles.length > app.state.bagCount) {
+    return toast(`Only ${app.state.bagCount} tiles left in the bag.`, 'err');
+  }
+  commit({ t: 'swap', p: app.me, tiles });
+  toast(`Swapped ${tiles.length} tile${tiles.length > 1 ? 's' : ''}.`);
+}
+
+const myTurn = () => app.state && !app.state.over && app.state.turn === app.me && app.me >= 0;
+
+function recall() {
+  app.pending = [];
+  app.selected = -1;
+  refresh();
+}
+
+/* ----------------------------------------------------------- interaction */
+
+function tapRack(i) {
+  if (app.swapping) {
+    app.swapping.has(i) ? app.swapping.delete(i) : app.swapping.add(i);
+    return refresh();
+  }
+  if (app.pending.some((p) => p.ri === i)) return;      // already on the board
+  app.selected = app.selected === i ? -1 : i;
+  refresh();
+}
+
+function tapSquare(r, c) {
+  const held = app.pending.findIndex((p) => p.r === r && p.c === c);
+  if (held >= 0) {                                     // take it back
+    app.pending.splice(held, 1);
+    return refresh();
+  }
+  if (app.state.board[r][c]) return;
+  if (app.selected < 0) return toast('Pick a tile from your rack first.');
+  if (!myTurn()) return toast("It is not your turn.", 'err');
+
+  const ch = app.rackView[app.selected];
+  const ri = app.selected;
+  if (ch === '?') {
+    pickLetter((letter) => {
+      app.pending.push({ r, c, letter, blank: true, ri });
+      app.selected = nextFree();
+      refresh();
+    });
+    return;
+  }
+  app.pending.push({ r, c, letter: ch, blank: false, ri });
+  app.selected = nextFree();
+  refresh();
+}
+
+function nextFree() {
+  const used = new Set(app.pending.map((p) => p.ri));
+  for (let i = 0; i < app.rackView.length; i++) if (!used.has(i)) return i;
+  return -1;
+}
+
+/* ---------------------------------------------------------------- modals */
+
+function modal(html, wire) {
+  const host = $('modalHost');
+  host.innerHTML = `<div class="modal"><div class="card">${html}</div></div>`;
+  const close = () => { host.innerHTML = ''; };
+  host.querySelector('.modal').addEventListener('click', (e) => {
+    if (e.target === host.querySelector('.modal')) close();
+  });
+  wire && wire(host, close);
+}
+
+function confirmBox(title, body, onYes) {
+  modal(`<h3>${title}</h3><p class="hint">${body}</p>
+    <div class="row"><button class="btn ghost" data-no>Cancel</button>
+    <button class="btn" data-yes>Yes</button></div>`,
+    (host, close) => {
+      host.querySelector('[data-no]').onclick = close;
+      host.querySelector('[data-yes]').onclick = () => { close(); onYes(); };
+    });
+}
+
+function pickLetter(cb) {
+  const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  modal(`<h3>Blank tile — choose a letter</h3>
+    <div class="letters">${L.map((l) => `<button data-l="${l}">${l}</button>`).join('')}</div>`,
+    (host, close) => {
+      host.querySelectorAll('[data-l]').forEach((b) => {
+        b.onclick = () => { close(); cb(b.dataset.l); };
+      });
+    });
+}
+
+function showMenu() {
+  const g = app.game;
+  const link = location.origin + location.pathname + '?r=' + g.room;
+  const hist = app.state.log.slice().reverse().map((l) => {
+    const who = g.players[l.p] ? g.players[l.p].name : 'Player ' + (l.p + 1);
+    const what = l.kind === 'play'
+      ? `<span class="w">${l.main}</span> for ${l.score}${l.bingo ? ' (bingo +35)' : ''}`
+      : l.kind === 'swap' ? `swapped ${l.count}` : l.kind;
+    return `<div class="logline">${what}<div class="p">${who}</div></div>`;
+  }).join('') || '<p class="hint">No moves yet.</p>';
+
+  modal(`<h3>Game code</h3>
+    <code class="room">${g.room}</code>
+    <button class="btn" data-share>Copy invite link</button>
+    <p class="hint" style="margin-top:10px">Send that link to your friend. It works on iPhone and
+      Android — she opens it in her browser and she is in. Add it to your home screen
+      to use it like an app.</p>
+    <div class="row"><button class="btn ghost" data-resign>Resign</button>
+      <button class="btn ghost" data-quit>Leave</button></div>
+    <h3 style="margin-top:18px">Moves</h3>${hist}`,
+    (host, close) => {
+      host.querySelector('[data-share]').onclick = async () => {
+        try {
+          if (navigator.share) await navigator.share({ title: 'Word Duel', url: link });
+          else { await navigator.clipboard.writeText(link); toast('Link copied.', 'ok'); }
+        } catch (e) { /* user dismissed the share sheet */ }
+      };
+      host.querySelector('[data-resign]').onclick = () => { close(); doResign(); };
+      host.querySelector('[data-quit]').onclick = () => {
+        close(); if (app.net) app.net.close();
+        location.href = location.origin + location.pathname;
+      };
+    });
+}
+
+function showGameOver() {
+  const s = app.state, g = app.game;
+  const nm = (i) => (g.players[i] ? g.players[i].name : 'Player ' + (i + 1));
+  let head;
+  if (s.winner === -1) head = "It's a tie!";
+  else if (s.winner === app.me) head = 'You win!';
+  else head = `${nm(s.winner)} wins.`;
+  const why = s.over.reason === 'resign' ? `${nm(s.over.by)} resigned.`
+    : s.over.reason === 'stalled' ? 'Neither player could move.'
+    : `${nm(s.over.by)} used every tile and took ${s.over.swing} points off the other rack.`;
+  modal(`<h3>${head}</h3>
+    <p>${nm(0)} ${s.scores[0]} &middot; ${nm(1)} ${s.scores[1]}</p>
+    <p class="hint">${why}</p>
+    <div class="row"><button class="btn" data-again>New game</button></div>`,
+    (host, close) => {
+      host.querySelector('[data-again]').onclick = () => {
+        close(); if (app.net) app.net.close();
+        location.href = location.origin + location.pathname;
+      };
+    });
+}
+
+/* --------------------------------------------------------------- drawing */
+
+function sizeBoard() {
+  const wrap = $('boardWrap');
+  const size = Math.floor(Math.min(wrap.clientWidth, wrap.clientHeight));
+  $('board').style.setProperty('--bs', size + 'px');
+}
+
+function drawBoard() {
+  const b = $('board');
+  const pend = new Map(app.pending.map((p) => [p.r + ',' + p.c, p]));
+  const frag = document.createDocumentFragment();
+  for (let r = 0; r < 15; r++) {
+    for (let c = 0; c < 15; c++) {
+      const d = document.createElement('div');
+      const prem = ENGINE.PREMIUM[r][c];
+      d.className = 'sq' + (prem ? ' ' + prem.toLowerCase() : '')
+        + (r === 7 && c === 7 ? ' star' : '');
+      if (prem) d.textContent = prem;
+      const on = app.state.board[r][c];
+      const p = pend.get(r + ',' + c);
+      if (on || p) {
+        const letter = on ? on.letter : p.letter;
+        const blank = on ? on.blank : p.blank;
+        const t = document.createElement('div');
+        t.className = 'tile' + (p ? ' pending' : '') + (blank ? ' blank' : '')
+          + (!p && app.lastPlayed.includes(r + ',' + c) ? ' last' : '');
+        t.textContent = letter;
+        if (!blank) {
+          const v = document.createElement('span');
+          v.className = 'v'; v.textContent = ENGINE.VALUES[letter];
+          t.appendChild(v);
+        }
+        d.textContent = '';
+        d.appendChild(t);
+      } else if (app.selected >= 0 && myTurn()) {
+        d.classList.add('tgt');
+      }
+      d.onclick = () => tapSquare(r, c);
+      frag.appendChild(d);
+    }
+  }
+  b.innerHTML = '';
+  b.appendChild(frag);
+}
+
+function drawRack() {
+  const el = $('rack');
+  const used = new Set(app.pending.map((p) => p.ri));
+  el.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const ch = app.rackView[i];
+    const d = document.createElement('div');
+    if (ch === undefined) { d.className = 'rt empty'; el.appendChild(d); continue; }
+    d.className = 'rt' + (used.has(i) ? ' gone' : '')
+      + (app.selected === i ? ' sel' : '')
+      + (app.swapping && app.swapping.has(i) ? ' swap' : '');
+    d.textContent = ch === '?' ? ' ' : ch;
+    if (ch !== '?') {
+      const v = document.createElement('span');
+      v.className = 'v'; v.textContent = ENGINE.VALUES[ch];
+      d.appendChild(v);
+    }
+    d.onclick = () => tapRack(i);
+    el.appendChild(d);
+  }
+}
+
+function drawHeader() {
+  const g = app.game, s = app.state;
+  for (const i of [0, 1]) {
+    const el = $('p' + i);
+    const p = g.players[i];
+    const label = (p ? p.name : 'waiting…') + (i === app.me ? ' (you)' : '');
+    el.querySelector('.nm').textContent = label;
+    el.querySelector('.sc').textContent = s.scores[i];
+    el.classList.toggle('turn', s.turn === i && !s.over);
+  }
+  $('bagTxt').textContent = s.bagCount + ' tiles left';
+}
+
+function updateButtons() {
+  const on = myTurn();
+  if (app.swapping) {
+    $('playBtn').textContent = 'Confirm';
+    $('recallBtn').textContent = 'Cancel';
+    $('playBtn').disabled = false; $('recallBtn').disabled = false;
+    $('shuffleBtn').disabled = true; $('swapBtn').disabled = true; $('passBtn').disabled = true;
+    return;
+  }
+  $('playBtn').textContent = 'Play';
+  $('recallBtn').textContent = 'Recall';
+  $('playBtn').disabled = !on || !app.pending.length;
+  $('recallBtn').disabled = !app.pending.length;
+  $('shuffleBtn').disabled = false;
+  $('swapBtn').disabled = !on || app.state.bagCount === 0;
+  $('passBtn').disabled = !on;
+}
+
+/* Shows what the tiles on the board are currently worth, before playing. */
+function previewScore() {
+  if (app.swapping || !app.pending.length) return;
+  const placed = app.pending.map((p) => ({ r: p.r, c: p.c, letter: p.letter, blank: p.blank }));
+  const res = ENGINE.tryPlay(app.state, placed, DICT);
+  if (res.ok) {
+    toast(`${res.words[0].word} — ${res.total}${res.bingo ? ' (bingo +35)' : ''}`, 'ok');
+  } else if (res.invalid) {
+    toast(res.error, 'err');
+  } else {
+    toast('');
+  }
+}
+
+function refresh(fromNet) {
+  app.state = ENGINE.replay(app.game, DICT);
+  if (app.me >= 0) {
+    const rack = app.state.racks[app.me];
+    /* Keep the player's own arrangement while the rack is unchanged. */
+    const same = app.rackView.length === rack.length &&
+      app.rackView.slice().sort().join('') === rack.slice().sort().join('');
+    if (!same) { app.rackView = rack.slice(); app.pending = []; app.selected = -1; }
+  } else {
+    app.rackView = [];
+  }
+  sizeBoard();
+  drawHeader(); drawBoard(); drawRack(); updateButtons();
+  if (!app.swapping) previewScore();
+
+  if (app.state.over && !app.shownOver) { app.shownOver = true; setTimeout(showGameOver, 350); }
+  if (fromNet && !app.state.over) {
+    if (myTurn() && !app.pending.length) toast('Your turn.', 'ok');
+  }
+}
+
+/* ------------------------------------------------------------------ boot */
+
+async function loadDict() {
+  const res = await fetch('dict.txt');
+  const text = await res.text();
+  DICT = new Set(text.split('\n').filter(Boolean));
+}
+
+function openGame(g) {
+  app.game = g;
+  app.shownOver = false;
+  claimSeat(g);
+  saveLocal();
+  $('setup').classList.add('hidden');
+  $('game').classList.remove('hidden');
+  history.replaceState(null, '', '?r=' + g.room);
+  startNet();
+  refresh();
+}
+
+function newGame(name) {
+  const room = roomCode();
+  openGame({
+    id: Math.random().toString(36).slice(2, 10),
+    room,
+    seed: (Math.random() * 0xffffffff) >>> 0,
+    createdAt: Date.now(),
+    players: [{ id: deviceId, name }, null],
+    moves: [],
+  });
+  setTimeout(showMenu, 400);
+}
+
+function joinGame(room, name) {
+  LS.set('wd_name', name);
+  const cached = LS.get('wd_game_' + room, null);
+  /* A joiner has no seed until the network hands one over; the placeholder is
+   * replaced by the real game on the first message, since it has more moves
+   * or an older id. */
+  openGame(cached || {
+    id: 'pending',
+    room,
+    seed: 1,
+    createdAt: Date.now(),
+    players: [null, null],
+    moves: [],
+    provisional: true,
+  });
+  if (!cached) toast('Looking for the game…');
+}
+
+window.addEventListener('resize', () => { if (app.game) { sizeBoard(); drawBoard(); } });
+
+(async function boot() {
+  $('nameIn').value = LS.get('wd_name', '');
+  const last = LS.get('wd_last', null);
+  const urlRoom = new URLSearchParams(location.search).get('r');
+  if (last && !urlRoom) {
+    $('resumeHint').innerHTML = `You have a game in room <b>${last}</b> — put that code in
+      the box above to pick it up.`;
+  }
+
+  $('newBtn').disabled = $('joinBtn').disabled = true;
+  $('newBtn').textContent = 'Loading dictionary…';
+  await loadDict();
+  $('newBtn').textContent = 'Start a new game';
+  $('newBtn').disabled = $('joinBtn').disabled = false;
+
+  $('newBtn').onclick = () => {
+    const name = ($('nameIn').value || 'Player 1').trim().slice(0, 14);
+    LS.set('wd_name', name);
+    newGame(name);
+  };
+  $('joinBtn').onclick = () => {
+    const room = ($('codeIn').value || '').trim().toUpperCase();
+    if (room.length !== 6) return alert('The game code is 6 characters.');
+    joinGame(room, ($('nameIn').value || 'Player 2').trim().slice(0, 14));
+  };
+  $('codeIn').addEventListener('input', (e) => {
+    e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  });
+
+  $('playBtn').onclick = () => (app.swapping ? doSwapCommit() : doPlay());
+  $('recallBtn').onclick = () => {
+    if (app.swapping) { app.swapping = null; refresh(); } else recall();
+  };
+  $('shuffleBtn').onclick = () => {
+    const free = app.rackView.filter((_, i) => !app.pending.some((p) => p.ri === i));
+    for (let i = free.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [free[i], free[j]] = [free[j], free[i]];
+    }
+    app.pending = []; app.selected = -1; app.rackView = free;
+    refresh();
+  };
+  $('swapBtn').onclick = () => {
+    recall(); app.swapping = new Set();
+    toast('Tap the tiles to throw back, then Confirm.');
+    refresh();
+  };
+  $('passBtn').onclick = doPass;
+  $('menuBtn').onclick = showMenu;
+
+  if (urlRoom) {
+    joinGame(urlRoom.toUpperCase(), ($('nameIn').value || 'Player 2').trim() || 'Player 2');
+  }
+})();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
