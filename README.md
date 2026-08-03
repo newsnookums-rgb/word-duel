@@ -22,9 +22,34 @@ score, so this follows WWF throughout:
 
 The board layout, letter values and tile counts are taken verbatim from a
 Words With Friends engine that had already been validated square by square
-against real games. The dictionary is ENABLE (168,567 words), which is what
+against real games. The dictionary is ENABLE (168,569 words), which is what
 WWF is built on, plus the short words it accepts that ENABLE predates
-(`QI`, `ZA`, `KI`, `OK`, `TE`, `GI`, …).
+(`QI`, `ZA`, `KI`, `OK`, `TE`, `GI`, …), plus the words a real WWF board has
+been observed to accept or refuse. Rebuild it with `python3 build_dict.py`;
+it re-reads those observations each time, so the list improves whenever a
+game turns up another one.
+
+### Game-flow rules, checked against Zynga's own rulebooks
+
+- **Playing out.** When a player empties their rack with the bag empty, the
+  opponent's remaining tile values are *transferred*: the finisher gains that
+  sum and the opponent loses it. Blanks count zero. (Zynga: "the opposing
+  player will lose points equal to the sum of the value of his remaining
+  tiles. This amount is then awarded to the player who placed the last tile.")
+- **Running out of moves.** The game ends after **three** successive scoreless
+  turns, not Scrabble's six, counted across *both* players — Zynga's own
+  example is pass / opponent passes / pass. Swaps count as scoreless, and so
+  does a play that happens to score nothing. It does **not** end while the
+  score is still 0-0, so an opening pass-pass-pass cannot kill a game that
+  never started.
+- **Swapping.** Allowed whenever at least one tile is in the bag, for up to
+  `min(rack, bag)` tiles. It ends your turn and scores nothing.
+
+One thing is a documented assumption rather than a rule: Zynga ties the rack
+adjustment only to "after the last tile is played" and says nothing about how
+racks are scored when a game ends on three scoreless turns instead. Each
+player dropping their own leftovers is the Scrabble and Wordfeud convention
+and is what this does; the assumption is marked in `engine.js`.
 
 ## How the live sync works
 
@@ -68,12 +93,16 @@ $JSC test/check.js -- test/cases.json
 # whole games: bag, draw order, turns, endgame, tile conservation
 python3 test/gen_game.py 120 > test/games.json
 $JSC test/check_replay.js -- test/games.json
+
+# merge convergence, and the rules random games rarely reach
+$JSC test/check_sync.js
+$JSC test/check_endgame.js
 ```
 
-Current status: **2,517/2,517 positions** and **120/120 complete games
-(4,077 moves)** agree move for move. The PRNG is separately confirmed
-bit-identical between the JavaScript and Python implementations, so the two
-phones always deal the same racks.
+Current status: **2,517/2,517 scoring positions**, **120/120 complete games
+(4,037 moves)**, **429/429 sync properties** and **14/14 endgame rules**. The
+PRNG is separately confirmed bit-identical between the JavaScript and Python
+implementations, so the two phones always deal the same racks.
 
 `test/gen_*.py` need the reference engine; point `WWF_DIR` at it if it is not
 in the default location.

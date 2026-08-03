@@ -264,7 +264,9 @@ function replay(game, dict) {
         words: words.map((w) => w.word),
         main: words.length ? words[0].word : '',
       });
-      consecutiveScoreless = 0;
+      /* Counted on the turn's SCORE, not on the move type, so a play that
+       * happens to score nothing (blanks on plain squares) counts too. */
+      consecutiveScoreless = total === 0 ? consecutiveScoreless + 1 : 0;
 
       if (!racks[who].length && !bag.length) {
         /* Going out: the player takes the value left on the other rack, and
@@ -296,8 +298,16 @@ function replay(game, dict) {
       over = { reason: 'resign', by: who };
     }
 
-    if (!over && consecutiveScoreless >= 6) {
-      /* Nobody can move. Each player drops what is left on their rack. */
+    /* Zynga: "The game could also end if three successive turns have occurred
+     * with no scoring and as long as the score is not zero-zero." Three, not
+     * Scrabble's six, and counted across BOTH players — their own example is
+     * pass / opponent passes / pass. The zero-zero guard stops an opening
+     * pass-pass-pass from killing a game that never started. */
+    if (!over && consecutiveScoreless >= 3 && !(scores[0] === 0 && scores[1] === 0)) {
+      /* Zynga documents the rack transfer only for the play-out ending, and
+       * says nothing about this one. Each player dropping their own leftovers
+       * is the Scrabble/Wordfeud convention and the best-supported default,
+       * but it IS an assumption — no official source covers it. */
       for (const s of [0, 1]) scores[s] -= racks[s].reduce((a, ch) => a + VALUES[ch], 0);
       over = { reason: 'stalled' };
     }

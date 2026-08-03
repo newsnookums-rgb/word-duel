@@ -2,7 +2,7 @@
  * The dictionary is 1.6 MB and never changes, so it is cached hard; the app
  * files go network-first so a fix reaches both phones on the next open. */
 
-const VERSION = 'wd-v2';
+const VERSION = 'wd-v3';
 const SHELL = [
   './', './index.html', './engine.js', './sync.js', './net.js', './dict.txt',
   './manifest.json',

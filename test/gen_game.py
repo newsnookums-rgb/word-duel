@@ -66,7 +66,8 @@ for gi in range(n_games):
                 racks[turn].remove('?' if (r, c) in m['wilds'] else ch)
             while len(racks[turn]) < 7 and bag:
                 racks[turn].append(bag.pop())
-            scoreless = 0
+            # counted on the turn's score, matching engine.js
+            scoreless = scoreless + 1 if m['score'] == 0 else 0
 
             if not racks[turn] and not bag:
                 over = {'reason': 'out', 'by': turn,
@@ -90,7 +91,8 @@ for gi in range(n_games):
             expect.append({'kind': 'pass', 'score': 0})
             scoreless += 1
 
-        if scoreless >= 6:
+        # WWF: three successive scoreless turns, unless the score is 0-0.
+        if scoreless >= 3 and not (scores[0] == 0 and scores[1] == 0):
             over = {'reason': 'stalled',
                     'left': [sum(VALUES[c] for c in racks[i]) for i in (0, 1)]}
             break
